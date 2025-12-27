@@ -692,7 +692,7 @@ def analyze_and_export_csv():
         overall_signal = 'VÀNG 🟡'
         # Trường hợp rủi ro kép (cả hai kênh đều VÀNG), xem như ĐỎ (kích hoạt tư vấn cá nhân) trong bối cảnh báo cáo 1 lần
         if 'VÀNG' in summary_signal_emo and 'VÀNG' in summary_signal_pos:
-            overall_signal = 'ĐỎ (Nguy cơ kép)🔴'
+            overall_signal = 'ĐỎ (Nguy cơ kép) 🔴'
 
     consultation_recommendation = ""
 
@@ -710,7 +710,7 @@ def analyze_and_export_csv():
     • Nhắc nhở điều chỉnh tư thế, thay đổi hoạt động.
     • Trao đổi nhẹ nhàng nhằm giảm căng thẳng tâm lý.
     """
-    elif overall_signal == 'ĐỎ (Nguy cơ kép)🔴':
+    elif overall_signal == 'ĐỎ (Nguy cơ kép) 🔴':
         consultation_recommendation = """
     TỔNG HỢP: Nguy cơ cao, cần kích hoạt tư vấn cá nhân.
     ĐỀ XUẤT:
