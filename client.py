@@ -497,7 +497,7 @@ class CameraMonitorUI(QMainWindow):
         
         scaled = self.current_pixmap.scaled(
             self.video_label.size(),
-            Qt.AspectRatioMode.KeepAspectRatio,   # 🔥 GIỮ TỈ LỆ
+            Qt.AspectRatioMode.KeepAspectRatio,   # GIỮ TỈ LỆ
             Qt.TransformationMode.SmoothTransformation
         )
         self.video_label.setPixmap(scaled)
@@ -725,18 +725,18 @@ class CameraMonitorUI(QMainWindow):
         if lbl_w == 0 or lbl_h == 0:
             return 0, 0
 
-        # 🔥 Tính tỉ lệ scale GIỮ NGUYÊN TỈ LỆ
+        # Tính tỉ lệ scale GIỮ NGUYÊN TỈ LỆ
         scale = min(lbl_w / vid_w, lbl_h / vid_h)
 
-        # 🔥 Kích thước video sau khi scale
+        # Kích thước video sau khi scale
         disp_w = vid_w * scale
         disp_h = vid_h * scale
 
-        # 🔥 Phần viền đen
+        # Phần viền đen
         offset_x = (lbl_w - disp_w) / 2
         offset_y = (lbl_h - disp_h) / 2
 
-        # 🔥 Tọa độ chuột tương đối so với video
+        # Tọa độ chuột tương đối so với video
         x = qpoint.x() - offset_x
         y = qpoint.y() - offset_y
 
@@ -744,7 +744,7 @@ class CameraMonitorUI(QMainWindow):
         if x < 0 or y < 0 or x > disp_w or y > disp_h:
             return None, None
 
-        # 🔥 Quy đổi về tọa độ frame gốc
+        # Quy đổi về tọa độ frame gốc
         real_x = int(x / scale)
         real_y = int(y / scale)
 
@@ -852,7 +852,7 @@ def resource_path(relative_path):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-    # 🔥 SET ICON TASKBAR
+    # SET ICON TASKBAR
     app.setWindowIcon(QIcon(resource_path("AI Smart Monitor.ico")))
 
     window = CameraMonitorUI()
