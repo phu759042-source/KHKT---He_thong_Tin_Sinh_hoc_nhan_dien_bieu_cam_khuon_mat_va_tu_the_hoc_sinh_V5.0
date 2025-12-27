@@ -1595,7 +1595,7 @@ def run_detection_camera(cam_index):
             if not ZONE_ID:
                 ok = ask_student_id(root)
 
-                # 🔥 ÉP cửa sổ OpenCV hiện lại sau khi đóng Tkinter
+                # ÉP cửa sổ OpenCV hiện lại sau khi đóng Tkinter
                 cv2.namedWindow(window_title)
                 hwnd = win32gui.FindWindow(None, window_title)
                 if hwnd:
@@ -1629,7 +1629,7 @@ def run_detection_camera(cam_index):
 
 
         elif key == ord('e') and ROI_ACTIVE:
-            # 🔥 GỬI TRẠNG THÁI CUỐI CÙNG NẾU ĐỦ ĐIỀU KIỆN
+            # GỬI TRẠNG THÁI CUỐI CÙNG NẾU ĐỦ ĐIỀU KIỆN
             if ROI_STATE_TRACKER["state"] and ROI_STATE_TRACKER["start_time"]:
                 now = time.time()
                 duration = now - ROI_STATE_TRACKER["start_time"]
@@ -2237,7 +2237,7 @@ def run_detection_fullscreen():
             if not ZONE_ID:
                 ok = ask_student_id(root)
 
-                # 🔥 ÉP cửa sổ OpenCV hiện lại sau khi đóng Tkinter
+                # ÉP cửa sổ OpenCV hiện lại sau khi đóng Tkinter
                 cv2.namedWindow(window_title)
                 hwnd = win32gui.FindWindow(None, window_title)
                 if hwnd:
