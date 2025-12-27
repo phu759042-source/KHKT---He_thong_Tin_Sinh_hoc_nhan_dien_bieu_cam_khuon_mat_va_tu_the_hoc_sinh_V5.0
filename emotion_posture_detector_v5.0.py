@@ -11,7 +11,7 @@ from tkinter import messagebox, ttk, filedialog
 from PIL import Image, ImageDraw, ImageFont, ImageTk
 import qrcode
 import io
-import pyautogui 
+import pyautogui
 from pygrabber.dshow_graph import FilterGraph 
 import win32gui
 import win32clipboard
@@ -66,20 +66,6 @@ EMOTION_THRESHOLDS = {
 
 # Cảm xúc bất lợi: Buồn, Giận, Sợ hãi
 NEGATIVE_EMOTIONS = ['Buồn', 'Giận dữ', 'Sợ hãi'] 
-# Tư thế bất lợi: Cúi nhiều
-BAD_POSTURE_STATUSES = ['Cúi nhiều']
-
-FPS = 15 
-# Ngưỡng Cảnh báo CẢM XÚC (Điều kiện cho Mẫu 01b - Cấp cá nhân) 
-EMO_THRESHOLD_PERCENT_RED = 40.0 # Bất lợi ổn định (buồn hoặc giận) >= 40% thời gian hợp lệ
-EMO_THRESHOLD_CONSECUTIVE_RED = 60 * FPS # Chuỗi liên tục >= 60 giây (~60 * 15 frames)
-
-# Ngưỡng Cảnh báo TƯ THẾ (Điều kiện cho Mẫu 01b - Cấp cá nhân) 
-POSTURE_THRESHOLD_CONSECUTIVE_RED = 30 * FPS # Cúi nhiều: >= 30 giây liên tục (~30 * 15 frames)
-POSTURE_COVERAGE_THRESHOLD = 0.5 # Bao phủ tư thế >= 50% để xét Cúi nhiều theo thời gian tiết
-
-# Ngưỡng CẢNH BÁO CHUNG (Vàng/Đỏ)
-WARNING_THRESHOLD_FRAMES = 120 # Ngưỡng chung để bắt đầu xét VÀNG/ĐỎ (ví dụ: 8 giây)
 
 # GLOBALS & KHỞI TẠO CHUNG
 latest_frame = None
@@ -95,7 +81,7 @@ detection_thread = None
 thread_lock = Lock()
 
 # CÁC THAY ĐỔI MỚI VỀ LOGGING DỮ LIỆU
-SCAN_MIN_DURATION = 30.0 # Bắt buộc quét tối thiểu 30 giây
+SCAN_MIN_DURATION = 1800.0 # Bắt buộc quét tối thiểu 1800 giây ~ 30 phút
 DATA_LOGS = []           # Danh sách toàn cục để lưu log dữ liệu
 LOG_LOCK = Lock()        # Lock cho việc ghi/đọc DATA_LOGS
 
@@ -112,18 +98,19 @@ ROI_ACTIVE = False
 roi_start = None
 roi_end = None
 roi_status_text = "Vẽ khung ROI: TẮT"
-roi_status_color = (255,0 ,0)
+roi_status_color = (255, 0, 0)
 ROI_IMAGE_PATH = None
 ROI_IMAGE_BUFFER = None
 roi_emotion_label = None
-ABNORMAL_DURATION_THRESHOLD = 5
+DISPLAY_SCALE_X = 1.0
+DISPLAY_SCALE_Y = 1.0
 
 # FULLSCREEN
 INCIDENT_STATE = None
 INCIDENT_START_TIME = None
 INCIDENT_START_TIME_STR = None
 
-ABNORMAL_THRESHOLD = 5  # giây
+ABNORMAL_THRESHOLD = 6  # giây
 
 ROI_LOGS = []
 roi_scan_start_time = None
@@ -267,26 +254,29 @@ def send_incident(state, start_time_str, duration):
     except Exception as e:
         print("[ERROR] Send incident:", e)
 
-
 def mouse_draw_roi(event, x, y, flags, param):
-    global roi_start, roi_end, ROI_BOX, ROI_DRAWING
+    global roi_start, roi_end, ROI_DRAWING, ROI_BOX
+    global DISPLAY_SCALE_X, DISPLAY_SCALE_Y
 
-    # Chỉ cho vẽ khi đang bật chế độ vẽ ROI và CHƯA active
-    if not ROI_DRAWING or ROI_ACTIVE:
+    if ROI_ACTIVE:
         return
 
-    # Nhấn chuột trái → bắt đầu vẽ
-    if event == cv2.EVENT_LBUTTONDOWN:
-        roi_start = (x, y)
-        roi_end = (x, y)
+    if not ROI_DRAWING:
+        return
+    
+    # CHUYỂN TỌA ĐỘ CHUỘT → FRAME GỐC
+    fx = int(x * DISPLAY_SCALE_X)
+    fy = int(y * DISPLAY_SCALE_Y)
 
-    # Giữ chuột và kéo → cập nhật khung realtime (XANH DA TRỜI)
-    elif event == cv2.EVENT_MOUSEMOVE and roi_start is not None:
-        roi_end = (x, y)
+    if event == cv2.EVENT_LBUTTONDOWN and ROI_DRAWING:
+        roi_start = (fx, fy)
+        roi_end = (fx, fy)
 
-    # Thả chuột → chốt ROI (VÀNG)
-    elif event == cv2.EVENT_LBUTTONUP and roi_start is not None:
-        roi_end = (x, y)
+    elif event == cv2.EVENT_MOUSEMOVE and ROI_DRAWING and roi_start:
+        roi_end = (fx, fy)
+
+    elif event == cv2.EVENT_LBUTTONUP and ROI_DRAWING:
+        roi_end = (fx, fy)
 
         x1, y1 = roi_start
         x2, y2 = roi_end
@@ -301,7 +291,6 @@ def mouse_draw_roi(event, x, y, flags, param):
         roi_start = None
         roi_end = None
 
-
 def mouse_draw_roi_fullscreen(event, x, y, flags, param):
     if ROI_ACTIVE:
         return
@@ -312,7 +301,7 @@ def mouse_draw_roi_fullscreen(event, x, y, flags, param):
     if not ROI_DRAWING:
         return
 
-    # 🔥 QUY ĐỔI TỌA ĐỘ TỪ ẢNH HIỂN THỊ → FRAME GỐC
+    # QUY ĐỔI TỌA ĐỘ TỪ ẢNH HIỂN THỊ → FRAME GỐC
     fx = int(x / scale_factor)
     fy = int(y / scale_factor)
 
@@ -336,7 +325,6 @@ def mouse_draw_roi_fullscreen(event, x, y, flags, param):
         )
         roi_start = None
         roi_end = None
-
 
 def show_success_with_open_folder(parent, export_file_path_csv, summary_path_txt):
     import tkinter as tk
@@ -398,7 +386,6 @@ def show_success_with_open_folder(parent, export_file_path_csv, summary_path_txt
 
     win.focus_force()
 
-
 def show_export_success_word(parent, folder_path):
     import tkinter as tk
     from tkinter import ttk
@@ -450,6 +437,7 @@ def export_roi_to_word():
     from collections import Counter
     import datetime, os
     from PIL import Image
+    import matplotlib.pyplot as plt
 
     if not ROI_LOGS or not ROI_BOX:
         return
@@ -459,7 +447,9 @@ def export_roi_to_word():
     doc = Document()
 
     # ===== TIÊU ĐỀ =====
-    doc.add_heading(f"BÁO CÁO PHÂN TÍCH ROI - EMOTION & POSTURE - HS-{ZONE_ID}", level=1)
+    doc.add_heading(
+        f"BÁO CÁO PHÂN TÍCH ROI - EMOTION & POSTURE - HS-{ZONE_ID}", level=1
+    )
 
     # ===== THÔNG TIN CHUNG =====
     now = datetime.datetime.now()
@@ -470,10 +460,10 @@ def export_roi_to_word():
     total_duration = int(end_time - start_time)
     total_frames = len(ROI_LOGS)
 
-    doc.add_paragraph(f"Tổng thời gian quét ROI: {total_duration} giây")
+    doc.add_paragraph(f"Tổng thời gian quét ROI: {total_duration} giây (~{total_duration/60:.2f} phút)")
     doc.add_paragraph(f"Tổng số frame ghi nhận: {total_frames} frame")
 
-    # ===== HÌNH ẢNH ROI =====
+    # ===== HÌNH ẢNH ROI (GIỮ NGUYÊN) =====
     if ROI_IMAGE_BUFFER:
         doc.add_heading("Hình ảnh vùng ROI", level=2)
 
@@ -499,24 +489,126 @@ def export_roi_to_word():
             height=Inches(img.height / dpi)
         )
 
-    # ===== THỐNG KÊ CẢM XÚC =====
-    doc.add_heading("Thống kê cảm xúc", level=2)
+    # ================== THỐNG KÊ & PHÂN TÍCH ==================
+
     emo_counter = Counter([log['emotion'] for log in ROI_LOGS])
-
-    for emotion, count in emo_counter.items():
-        ratio = (count / total_frames) * 100
-        doc.add_paragraph(f"- {emotion}: {count} frame ({ratio:.2f}%)")
-
-    # ===== THỐNG KÊ TƯ THẾ =====
     posture_list = [log.get('posture') for log in ROI_LOGS if log.get('posture')]
+    pos_counter = Counter(posture_list)
 
-    if posture_list:
-        doc.add_heading("Thống kê tư thế", level=2)
-        pos_counter = Counter(posture_list)
+    # ===== THỐNG KÊ CẢM XÚC (%) =====
+    doc.add_heading("Thống kê biểu cảm khuôn mặt (%)", level=2)
 
-        for posture, count in pos_counter.items():
-            ratio = (count / total_frames) * 100
-            doc.add_paragraph(f"- {posture}: {count} frame ({ratio:.2f}%)")
+    emo_percent = {}
+    for emo, count in emo_counter.items():
+        pct = round(count / total_frames * 100, 2)
+        emo_percent[emo] = pct
+        doc.add_paragraph(f"- {emo}: {pct}%")
+
+    # ===== BIỂU ĐỒ CẢM XÚC =====
+    if emo_percent:
+        plt.figure(figsize=(6, 4))
+        plt.bar(emo_percent.keys(), emo_percent.values())
+        plt.title("Phân bố biểu cảm khuôn mặt")
+        plt.ylabel("Tỷ lệ (%)")
+        plt.xticks(rotation=30)
+        plt.tight_layout()
+
+        emo_chart = BytesIO()
+        plt.savefig(emo_chart, format="PNG")
+        plt.close()
+        emo_chart.seek(0)
+
+        doc.add_picture(emo_chart, width=Inches(5))
+
+    # ===== THỐNG KÊ TƯ THẾ (%) =====
+    if pos_counter:
+        doc.add_heading("Thống kê tư thế (%)", level=2)
+
+        pos_percent = {}
+        for pos, count in pos_counter.items():
+            pct = round(count / total_frames * 100, 2)
+            pos_percent[pos] = pct
+            doc.add_paragraph(f"- {pos}: {pct}%")
+
+        # ===== BIỂU ĐỒ TƯ THẾ =====
+        plt.figure(figsize=(6, 4))
+        plt.bar(pos_percent.keys(), pos_percent.values())
+        plt.title("Phân bố tư thế")
+        plt.ylabel("Tỷ lệ (%)")
+        plt.xticks(rotation=30)
+        plt.tight_layout()
+
+        pos_chart = BytesIO()
+        plt.savefig(pos_chart, format="PNG")
+        plt.close()
+        pos_chart.seek(0)
+
+        doc.add_picture(pos_chart, width=Inches(5))
+
+    # ================== TƯ VẤN SỨC KHỎE HỌC ĐƯỜNG ==================
+
+    NEGATIVE_EMOTIONS = ['Buồn', 'Giận dữ', 'Sợ hãi', 'Ghê sợ']
+
+    negative_emo_ratio = sum(
+        emo_percent.get(emo, 0) for emo in NEGATIVE_EMOTIONS
+    )
+
+    bad_posture_ratio = pos_percent.get('Cúi nhiều (Bad)', 0)
+    posture_coverage = sum(pos_percent.values())
+
+    summary_signal_emo = "XANH"
+    summary_signal_pos = "XANH"
+    quality_check = "TỐT"
+
+    if negative_emo_ratio >= 40:
+        summary_signal_emo = "VÀNG (Bất lợi ≥ 40%)"
+
+    if posture_coverage < 50:
+        quality_check = "CẦN CẢI THIỆN"
+        summary_signal_pos = "VÀNG (Bao phủ < 50%)"
+    elif bad_posture_ratio >= 5:
+        summary_signal_pos = "VÀNG (Cúi nhiều ≥ 5%)"
+
+    overall_signal = "XANH 🟢"
+    if "VÀNG" in summary_signal_emo or "VÀNG" in summary_signal_pos:
+        overall_signal = "VÀNG 🟡"
+        if "VÀNG" in summary_signal_emo and "VÀNG" in summary_signal_pos:
+            overall_signal = "ĐỎ (Nguy cơ kép) 🔴"
+
+    doc.add_heading("Tín hiệu cảnh báo tổng hợp", level=2)
+    doc.add_paragraph(f"- Tín hiệu biểu cảm khuôn mặt: {summary_signal_emo}")
+    doc.add_paragraph(f"- Tín hiệu tư thế: {summary_signal_pos}")
+    doc.add_paragraph(f"- Chất lượng dữ liệu tư thế: {quality_check}")
+
+    doc.add_heading("Đánh giá & tư vấn sức khỏe học đường", level=2)
+
+
+    doc.add_paragraph(f"Mức độ nguy cơ tổng hợp (phiên quét): {overall_signal}")
+
+    if overall_signal == "XANH 🟢":
+        doc.add_paragraph(
+            "TỔNG HỢP: Ngưỡng an toàn.\n"
+            "KHUYẾN NGHỊ: Duy trì theo dõi định kỳ. "
+            "Giáo viên có thể nhắc nhở điều chỉnh tư thế hoặc thay đổi hoạt động nhẹ khi cần."
+        )
+
+    elif overall_signal == "VÀNG 🟡":
+        doc.add_paragraph(
+            "TỔNG HỢP: Nguy cơ trung bình, cần sàng lọc nhanh.\n"
+            "QUY TRÌNH ĐỀ XUẤT:\n"
+            "• Quan sát bổ sung trong các buổi học tiếp theo.\n"
+            "• Nhắc nhở điều chỉnh tư thế, thay đổi hoạt động.\n"
+            "• Trao đổi nhẹ nhàng nhằm giảm căng thẳng tâm lý."
+        )
+
+    elif overall_signal == "ĐỎ (Nguy cơ kép) 🔴":
+        doc.add_paragraph(
+            "TỔNG HỢP: Nguy cơ cao, cần kích hoạt tư vấn cá nhân.\n"
+            "ĐỀ XUẤT:\n"
+            "• Kiểm chứng dữ liệu kỹ thuật và quan sát trực tiếp.\n"
+            "• Tham vấn giáo viên chủ nhiệm và chuyên viên tâm lý.\n"
+            "• Xây dựng kế hoạch hỗ trợ cá nhân hóa cho học sinh."
+        )
 
     # ===== LƯU FILE =====
     filename = f"ROI_Report_{now.strftime('%Y%m%d_%H%M%S')}.docx"
@@ -524,9 +616,7 @@ def export_roi_to_word():
     doc.save(filepath)
 
     print(f"[INFO] Đã lưu báo cáo ROI tại: {filepath}")
-
     show_export_success_word(root, log_directory)
-
 
 def analyze_and_export_csv():
     """
@@ -558,7 +648,7 @@ def analyze_and_export_csv():
     summary_path_txt = os.path.join(base_dir_csv, f"{file_name_base}_SUMMARY.txt")
     
     
-    # --- B. PHÂN TÍCH VÀ TÍNH TOÁN (Logic của bạn về Durations, Ratios, Signals) ---
+    # --- B. PHÂN TÍCH VÀ TÍNH TOÁN ---
     # *Đây là phần phức tạp nhất, tôi giữ lại logic phân tích tổng hợp từ các lần trước để tạo ra file TXT*
     
     emotion_duration = {}
@@ -578,7 +668,7 @@ def analyze_and_export_csv():
     emo_ratios = {emo: (dur / total_valid_emo_duration) * 100 for emo, dur in emotion_duration.items()} if total_valid_emo_duration > 0 else {}
     pos_ratios = {pos: (dur / total_posture_duration) * 100 for pos, dur in posture_duration.items()} if total_posture_duration > 0 else {}
     
-    NEGATIVE_EMOTIONS = ['Buồn', 'Giận dữ', 'Sợ hãi'] 
+    NEGATIVE_EMOTIONS = ['Buồn', 'Giận dữ', 'Sợ hãi', 'Ghê sợ'] 
     negative_emo_ratio = sum(emo_ratios.get(emo, 0) for emo in NEGATIVE_EMOTIONS)
     no_posture_duration = posture_duration.get('N/A', 0) + posture_duration.get('Không phát hiện tư thế', 0)
     no_posture_ratio = (no_posture_duration / total_posture_duration) * 100 if total_posture_duration > 0 else 0
@@ -597,36 +687,36 @@ def analyze_and_export_csv():
     elif bad_posture_ratio >= 5: summary_signal_pos = 'VÀNG (Cúi nhiều >= 5%)'
     
     # --- LOGIC XÁC ĐỊNH NGƯỠNG TƯ VẤN (TỔNG HỢP - BỔ SUNG) ---
-    overall_signal = 'XANH'
+    overall_signal = 'XANH 🟢'
     if 'VÀNG' in summary_signal_emo or 'VÀNG' in summary_signal_pos:
-        overall_signal = 'VÀNG'
+        overall_signal = 'VÀNG 🟡'
         # Trường hợp rủi ro kép (cả hai kênh đều VÀNG), xem như ĐỎ (kích hoạt tư vấn cá nhân) trong bối cảnh báo cáo 1 lần
         if 'VÀNG' in summary_signal_emo and 'VÀNG' in summary_signal_pos:
-            overall_signal = 'ĐỎ (Nguy cơ kép)' 
+            overall_signal = 'ĐỎ (Nguy cơ kép)🔴'
 
     consultation_recommendation = ""
 
-    if overall_signal == 'XANH':
+    if overall_signal == 'XANH 🟢':
         consultation_recommendation = """
-    TỔNG HỢP: Ngưỡng an toàn (XANH).
-    KHUYẾN NGHỊ: Duy trì theo dõi định kỳ. Cán bộ quản lý có thể nhắc học sinh điều chỉnh tư thế hoặc đổi hoạt động nhẹ khi cần thiết.
+    TỔNG HỢP: Ngưỡng an toàn.
+    KHUYẾN NGHỊ: Duy trì theo dõi định kỳ.
+    Giáo viên có thể nhắc nhở điều chỉnh tư thế hoặc thay đổi hoạt động nhẹ khi cần.
     """
-    elif overall_signal == 'VÀNG':
+    elif overall_signal == 'VÀNG 🟡':
         consultation_recommendation = """
-    TỔNG HỢP: Nguy cơ trung bình (VÀNG). Cần sàng lọc nhanh.
-    QUY TRÌNH HÀNH ĐỘNG:
-    1. Quan sát bổ sung: Giáo viên/Người quan sát cần chú ý tần suất và bối cảnh xảy ra tín hiệu (Tư thế Cúi nhiều hoặc Cảm xúc Bất lợi).
-    2. Sàng lọc nhanh tại lớp: Áp dụng phiếu 3 câu trung lập và ghi chú bối cảnh sư phạm.
-    3. Can thiệp ban đầu: Nhắc học sinh điều chỉnh tư thế, thay đổi hoạt động, hoặc thư giãn ngắn.
+    TỔNG HỢP: Nguy cơ trung bình, cần sàng lọc nhanh.
+    QUY TRÌNH ĐỀ XUẤT:
+    • Quan sát bổ sung trong các buổi học tiếp theo.
+    • Nhắc nhở điều chỉnh tư thế, thay đổi hoạt động.
+    • Trao đổi nhẹ nhàng nhằm giảm căng thẳng tâm lý.
     """
-    elif overall_signal == 'ĐỎ (Nguy cơ kép)':
+    elif overall_signal == 'ĐỎ (Nguy cơ kép)🔴':
         consultation_recommendation = """
-    TỔNG HỢP: Nguy cơ cao (ĐỎ), cần kích hoạt tư vấn cá nhân.
-    QUY TRÌNH XÁC NHẬN CHUYÊN SÂU:
-    Căn cứ vào dữ liệu cho thấy rủi ro đồng thời ở cả hai kênh trong một phiên (hoặc vượt ngưỡng), khuyến nghị thực hiện quy trình xác nhận đa bước sau theo Khung Trường học thúc đẩy sức khỏe của WHO/UNESCO:
-    1. Kiểm chứng kỹ thuật: Báo cáo độ trễ, tỷ lệ khung hợp lệ, ECE.
-    2. Đối chiếu con người: Hai người quan sát độc lập dùng bảng mã ngắn (theo FACS mức cơ bản, tư thế theo ISO) để tính độ tin cậy (kappa).
-    3. Lập kế hoạch tư vấn: Xây dựng kế hoạch can thiệp cụ thể, đảm bảo hồ sơ ẩn danh, và truyền thông minh bạch với cha mẹ học sinh.
+    TỔNG HỢP: Nguy cơ cao, cần kích hoạt tư vấn cá nhân.
+    ĐỀ XUẤT:
+    • Kiểm chứng dữ liệu kỹ thuật và quan sát trực tiếp.
+    • Tham vấn giáo viên chủ nhiệm và chuyên viên tâm lý.
+    • Xây dựng kế hoạch hỗ trợ cá nhân hóa cho học sinh.
     """
 
     # --- C. TẠO NỘI DUNG BÁO CÁO TỔNG HỢP (TXT) ---
@@ -649,8 +739,8 @@ def analyze_and_export_csv():
 - Hơi cúi (Cảnh báo): {pos_ratios.get('Hơi cúi (Warning)', 0):.2f}%
 - **Cúi nhiều (Bad): {bad_posture_ratio:.2f}%** (Ngưỡng Mẫu 01b: >= 5%)
 
-3. PHÂN TÍCH CẢM XÚC (EMOTION)
-- Tỷ lệ Cảm xúc Bất lợi: **{negative_emo_ratio:.2f}%** (Ngưỡng Mẫu 01b: >= 40%)
+3. PHÂN TÍCH BIỂU CẢM KHUÔN MẶT
+- Tỷ lệ Biểu cảm khuôn mặt Bất lợi: **{negative_emo_ratio:.2f}%** (Ngưỡng Mẫu 01b: >= 40%)
 --- Tỷ lệ Chi tiết ---
 - Buồn: {emo_ratios.get('Buồn', 0):.2f}%
 - Giận dữ: {emo_ratios.get('Giận dữ', 0):.2f}%
@@ -661,7 +751,7 @@ def analyze_and_export_csv():
 - Ghê sợ: {emo_ratios.get('Ghê sợ', 0):.2f}%
 
 4. TÍN HIỆU CẢNH BÁO TỔNG HỢP LỚP (Mẫu 01a)
-- Tín hiệu Cảm xúc: {summary_signal_emo}
+- Tín hiệu Biểu cảm khuôn mặt: {summary_signal_emo}
 - Tín hiệu Tư thế: {summary_signal_pos}
 
 ===================================================
@@ -675,7 +765,7 @@ def analyze_and_export_csv():
     data_to_export = [
         ["Tổng thời gian quét", f"{session_duration:.2f} giây"],
         ["---", "---"],
-        ["Phân tích Cảm xúc", "Thời gian (giây)"],
+        ["Phân tích Biểu cảm", "Thời gian (giây)"],
     ]
     for emo, dur in emotion_duration.items():
         data_to_export.append([emo, f"{dur:.2f}"])
@@ -699,7 +789,7 @@ def analyze_and_export_csv():
             f.write(report_content)
 
         show_success_with_open_folder(
-            root,   # ✅ cửa sổ chính Tk của bạn
+            root,# Cửa sổ chính Tk
             export_file_path_csv,
             summary_path_txt
         )
@@ -949,7 +1039,6 @@ def show_loading_window(title="Đang khởi động hệ thống..."):
     y = root.winfo_y() + (root.winfo_height() - loading_window.winfo_reqheight()) // 2
     loading_window.geometry(f"+{x}+{y}")
 
-
 def update_progress(percent, text=None):
     if progress_bar and progress_label and loading_window and loading_window.winfo_exists():
         progress_bar["value"] = percent
@@ -1071,9 +1160,10 @@ def run_detection_camera(cam_index):
     global latest_frame, frame_lock, is_running, root, broadcast_thread, detection_thread
     global cap, DATA_LOGS, SCAN_MIN_DURATION
     global ROI_ACTIVE, ROI_BOX, ROI_DRAWING, ROI_IMAGE_PATH
-    global roi_status_color, roi_status_text, roi_emotion_label, ABNORMAL_DURATION_THRESHOLD
+    global roi_status_color, roi_status_text, roi_emotion_label, ABNORMAL_THRESHOLD
     global class_name, ZONE_ID
     global roi_start, roi_end
+    global DISPLAY_SCALE_X, DISPLAY_SCALE_Y
 
     ROI_ACTIVE = False
     ROI_DRAWING = False
@@ -1099,7 +1189,7 @@ def run_detection_camera(cam_index):
         broadcast_thread = Thread(target=udp_broadcast, args=(link,), daemon=True)
         broadcast_thread.start()
 
-    update_progress(25, "Đang tải mô hình nhận diện cảm xúc (Keras)...")
+    update_progress(25, "Đang tải mô hình nhận diện biểu cảm (Keras)...")
     import mediapipe as mp
     try:
         from tensorflow.keras.models import load_model
@@ -1256,10 +1346,10 @@ def run_detection_camera(cam_index):
 
         negative_ratio = sum(history) / len(history) if len(history) > 0 else 0
         elapsed = time.time() - start_time
-        if elapsed >= interval:
-            if negative_ratio > 0.6:
-                show_warning("Pause / đổi hoạt động / nghỉ 2 phút")
-            start_time = time.time()
+        #if elapsed >= interval:
+        #    if negative_ratio > 0.6:
+        #        show_warning("Pause / đổi hoạt động / nghỉ 2 phút")
+        #    start_time = time.time()
         
 
         labels = [final_emotion_label]
@@ -1289,7 +1379,7 @@ def run_detection_camera(cam_index):
         status_back, status_neck, status_elbow = "Không phát hiện", "Không phát hiện", "Không phát hiện"
         status_posture = "Không phát hiện tư thế"
 
-        if results.pose_landmarks:
+        if results is not None and results.pose_landmarks:
             landmarks = results.pose_landmarks.landmark
             person_in_roi = False
 
@@ -1425,7 +1515,7 @@ def run_detection_camera(cam_index):
                     )
 
                     # Nếu bất thường và đủ thời gian → GỬI NGAY
-                    if is_abnormal and duration >= ABNORMAL_DURATION_THRESHOLD:
+                    if is_abnormal and duration >= ABNORMAL_THRESHOLD:
                         now_dt = datetime.datetime.now()
                         start_time_str = (now_dt - datetime.timedelta(seconds=duration)).strftime('%H:%M:%S')
 
@@ -1544,7 +1634,7 @@ def run_detection_camera(cam_index):
                 now = time.time()
                 duration = now - ROI_STATE_TRACKER["start_time"]
 
-                if duration >= ABNORMAL_DURATION_THRESHOLD:
+                if duration >= ABNORMAL_THRESHOLD:
                     duration = int(time.time() - ROI_STATE_TRACKER["start_time"])
 
                     now_dt = datetime.datetime.now()
@@ -1577,14 +1667,13 @@ def run_detection_camera(cam_index):
             latest_frame = frame_stream.copy()
 
         new_w, new_h = int(WIDTH * scale_factor), int(HEIGHT * scale_factor)
-        if ROI_DRAWING and roi_start and roi_end:
-            cv2.rectangle(
-                frame,
-                roi_start,
-                roi_end,
-                (255, 255, 0),  # Xanh da trời
-                2
-            )
+
+        DISPLAY_SCALE_X = WIDTH / new_w
+        DISPLAY_SCALE_Y = HEIGHT / new_h
+
+        if ROI_DRAWING and not ROI_ACTIVE and roi_start and roi_end:
+            cv2.rectangle(frame, roi_start, roi_end, (255,255,0), 2) # Xanh da trời
+
 
         # Đã thả chuột → khung VÀNG + chữ
         if ROI_BOX:
@@ -1593,7 +1682,7 @@ def run_detection_camera(cam_index):
                 frame,
                 (x1, y1),
                 (x2, y2),
-                (0, 255, 255),  # Vàng
+                (0, 255, 255) if not ROI_ACTIVE else (0, 255, 0),  # Vàng
                 2
             )
 
@@ -1603,13 +1692,12 @@ def run_detection_camera(cam_index):
                 (x1, y1 - 10),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.7,
-                (0, 255, 255),
+                (0, 255, 255) if not ROI_ACTIVE else (0, 255, 0),
                 2
             )
 
-
-
         cv2.imshow(window_title, cv2.resize(frame, (new_w, new_h)))
+
 
         camera_icon = os.path.join(BASE_DIR, "Emotion + Posture Detector v3.0 Camera.ico")
 
@@ -1639,15 +1727,14 @@ def run_detection_camera(cam_index):
     if len(DATA_LOGS) > 1:
         root.after(100, analyze_and_export_csv) # Chạy hàm xuất CSV trên luồng chính Tkinter
 
-
 # HÀM CHÍNH CHO FULLSCREEN (Thêm logic thoát)
 
 def run_detection_fullscreen():
     global latest_frame, frame_lock, is_running, root, broadcast_thread, detection_thread
     global cap, DATA_LOGS, SCAN_MIN_DURATION, WIDTH_SCR, HEIGHT_SCR # THÊM WIDTH_SCR, HEIGHT_SCR
-    global INCIDENT_STATE, INCIDENT_START_TIME, INCIDENT_START_TIME_STR, ABNORMAL_THRESHOLD
+    global INCIDENT_STATE, INCIDENT_START_TIME, INCIDENT_START_TIME_STR
     global ROI_ACTIVE, ROI_BOX, ROI_DRAWING, ROI_IMAGE_PATH
-    global roi_status_color, roi_status_text, roi_emotion_label, ABNORMAL_DURATION_THRESHOLD
+    global roi_status_color, roi_status_text, roi_emotion_label, ABNORMAL_THRESHOLD
     global roi_start, roi_end, scale_factor
     global class_name, ZONE_ID
 
@@ -1659,8 +1746,6 @@ def run_detection_fullscreen():
     INCIDENT_STATE = None
     INCIDENT_START_TIME = None
     INCIDENT_START_TIME_STR = None
-    
-    ABNORMAL_THRESHOLD = 5  # giây
 
     DATA_LOGS = [] # Xóa log cũ
     scan_start_time = time.time()
@@ -1685,7 +1770,7 @@ def run_detection_fullscreen():
         broadcast_thread.start()
 
     # show_loading_window("Đang khởi động Fullscreen Capture...")
-    update_progress(25, "Đang tải mô hình nhận diện cảm xúc (Keras)...")
+    update_progress(25, "Đang tải mô hình nhận diện biểu cảm (Keras)...")
     import mediapipe as mp
     try:
         from tensorflow.keras.models import load_model
@@ -1871,7 +1956,7 @@ def run_detection_fullscreen():
         status_posture = "Không phát hiện tư thế"
         color = (255, 255, 255)
         
-        if results.pose_landmarks:
+        if results is not None and results.pose_landmarks:
             landmarks = results.pose_landmarks.landmark
             
             person_in_roi = False
@@ -2006,7 +2091,7 @@ def run_detection_fullscreen():
                     )
 
                     # Nếu bất thường và đủ thời gian → GỬI NGAY
-                    if is_abnormal and duration >= ABNORMAL_DURATION_THRESHOLD:
+                    if is_abnormal and duration >= ABNORMAL_THRESHOLD:
                         now_dt = datetime.datetime.now()
                         start_time_str = (now_dt - datetime.timedelta(seconds=duration)).strftime('%H:%M:%S')
 
@@ -2185,12 +2270,12 @@ def run_detection_fullscreen():
 
 
         elif key == ord('e') and ROI_ACTIVE:
-            # 🔥 GỬI TRẠNG THÁI CUỐI CÙNG NẾU ĐỦ ĐIỀU KIỆN
+            # GỬI TRẠNG THÁI CUỐI CÙNG NẾU ĐỦ ĐIỀU KIỆN
             if ROI_STATE_TRACKER["state"] and ROI_STATE_TRACKER["start_time"]:
                 now = time.time()
                 duration = now - ROI_STATE_TRACKER["start_time"]
 
-                if duration >= ABNORMAL_DURATION_THRESHOLD:
+                if duration >= ABNORMAL_THRESHOLD:
                     duration = int(time.time() - ROI_STATE_TRACKER["start_time"])
 
                     now_dt = datetime.datetime.now()
@@ -2225,14 +2310,8 @@ def run_detection_fullscreen():
         # ===== VẼ ROI REALTIME (FULLSCREEN) =====
 
         # Đang kéo chuột → khung XANH DA TRỜI
-        if ROI_DRAWING and roi_start and roi_end:
-            cv2.rectangle(
-                frame,
-                roi_start,
-                roi_end,
-                (255, 255, 0),  # Xanh da trời
-                2
-            )
+        if ROI_DRAWING and not ROI_ACTIVE and roi_start and roi_end:
+            cv2.rectangle(frame, roi_start, roi_end, (255,255,0), 2) # Xanh da trời
 
         # Đã thả chuột → khung VÀNG + chữ
         if ROI_BOX:
@@ -2241,7 +2320,7 @@ def run_detection_fullscreen():
                 frame,
                 (x1, y1),
                 (x2, y2),
-                (0, 255, 255),  # Vàng
+                (0, 255, 255) if not ROI_ACTIVE else (0, 255, 0),  # Vàng
                 2
             )
 
@@ -2251,7 +2330,7 @@ def run_detection_fullscreen():
                 (x1, y1 - 10),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.7,
-                (0, 255, 255),
+                (0, 255, 255) if not ROI_ACTIVE else (0, 255, 0),
                 2
             )
 
@@ -2510,8 +2589,8 @@ if os.path.exists(icon_path):
 root.protocol("WM_DELETE_WINDOW", on_closing) 
 
 window_width = 550
-# Chiều cao đã được tăng lên để chứa 3 nút
-window_height = 320
+# Chiều cao đã được tăng lên để chứa 4 nút
+window_height = 300
 screen_width = root.winfo_screenwidth()
 screen_height = root.winfo_screenheight()
 x = (screen_width // 2) - (window_width // 2)
@@ -2533,11 +2612,11 @@ tk.Button(root, text="🖥️ QUÉT BẰNG MÀN HÌNH",
 
 tk.Button(root, text="AI Smart Monitor",
           command=open_aismartmonitor,
-          width=30, height=2, bg="#5d8eac", fg="white", font=("Arial", 10, "bold")).pack(pady=5)
+          width=30, height=2, bg="#216C71", fg="white", font=("Arial", 10, "bold")).pack(pady=5)
 
 # Nút tùy chọn thư mục log
 tk.Button(root, text="📁 Xuất file log tại...",
           command=set_log_directory,
-          width=30, height=2, bg="#607D8B", fg="white", font=("Arial", 10, "bold")).pack(pady=5)
+          width=30, height=2, bg="#38505D", fg="white", font=("Arial", 10, "bold")).pack(pady=5)
 
 root.mainloop()
