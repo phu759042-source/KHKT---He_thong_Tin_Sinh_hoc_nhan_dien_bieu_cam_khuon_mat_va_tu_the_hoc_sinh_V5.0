@@ -120,6 +120,7 @@ ROI_ALERT_HISTORY = deque(maxlen=60)   # lưu 60 giây
 
 log_directory = BASE_DIR # Khai báo biến toàn cục cho thư mục log, mặc định là BASE_DIR
 
+force_exit_no_report = False
 # UTILITIES CHUNG
 
 def set_opencv_window_icon(window_title, icon_path):
@@ -1153,6 +1154,46 @@ HTML_PAGE = """
 </html>
 """
 
+# HÀM HỎI CÓ QUÉT TIẾP HAY KHÔNG(DÙNG CHUNG CHO CAMERA VÀ FULLSCREEN)
+def ask_yes_no_blocking(title, message):
+    dialog = tk.Toplevel(root)
+    dialog.title(title)
+    dialog.attributes('-topmost', True)
+    dialog.grab_set()  # khóa focus
+    dialog.resizable(False, False)
+
+    result = {'value': False}
+
+    def on_yes():
+        result['value'] = True
+        dialog.destroy()
+
+    def on_no():
+        result['value'] = False
+        dialog.destroy()
+
+    tk.Label(dialog, text=message, justify='left', wraplength=400)\
+        .pack(padx=20, pady=15)
+
+    btn_frame = tk.Frame(dialog)
+    btn_frame.pack(pady=10)
+
+    tk.Button(btn_frame, text="Yes", width=10, command=on_yes)\
+        .pack(side='left', padx=10)
+    tk.Button(btn_frame, text="No", width=10, command=on_no)\
+        .pack(side='right', padx=10)
+
+    # Căn giữa màn hình
+    dialog.update_idletasks()
+    w = dialog.winfo_width()
+    h = dialog.winfo_height()
+    x = (dialog.winfo_screenwidth() // 2) - (w // 2)
+    y = (dialog.winfo_screenheight() // 2) - (h // 2)
+    dialog.geometry(f"+{x}+{y}")
+
+    dialog.wait_window()  # ⛔ BLOCK tại đây
+
+    return result['value']
 
 # HÀM CHÍNH CHO CAMERA (Thêm logic thoát)
 
@@ -1164,6 +1205,7 @@ def run_detection_camera(cam_index):
     global class_name, ZONE_ID
     global roi_start, roi_end
     global DISPLAY_SCALE_X, DISPLAY_SCALE_Y
+    global force_exit_no_report
 
     ROI_ACTIVE = False
     ROI_DRAWING = False
@@ -1253,6 +1295,7 @@ def run_detection_camera(cam_index):
 
     status_posture = "Không phát hiện tư thế"
 
+    force_exit_no_report = False
     # Vòng lặp chính
     while cap.isOpened() and is_running:
         ret, frame = cap.read()
@@ -1575,12 +1618,31 @@ def run_detection_camera(cam_index):
         if key == ord('m'): scale_factor = min(1.0, scale_factor + 0.1)
         elif key == ord('n'): scale_factor = max(0.2, scale_factor - 0.1)
         elif key == ord('q'):
-            # Bắt buộc phải quét tối thiểu 30s
-            if current_time - scan_start_time < SCAN_MIN_DURATION:
-                remaining = int(SCAN_MIN_DURATION - (current_time - scan_start_time))
-                show_warning(f"Chưa đủ thời gian quét! Cần quét tối thiểu {SCAN_MIN_DURATION} giây.\nVui lòng chờ thêm {remaining} giây.")
+            current_time = time.time()
+            elapsed = current_time - scan_start_time
+
+            # CHƯA đủ thời gian quét
+            if elapsed < SCAN_MIN_DURATION:
+                remaining = int(SCAN_MIN_DURATION - elapsed)
+
+                answer = ask_yes_no_blocking(
+                    "Chưa đủ thời gian quét",
+                    f"Cần quét tối thiểu {SCAN_MIN_DURATION} giây.\n"
+                    f"Bạn cần quét thêm {remaining} giây nữa.\n\n"
+                    f"Nếu dừng bây giờ sẽ KHÔNG xuất báo cáo.\n"
+                    f"Bạn có chắc chắn muốn dừng không?"
+                )
+
+                if answer:
+                    force_exit_no_report = True
+                    break   # thoát vòng lặp CV2
+                else:
+                    continue  # tiếp tục quét
+
+            # ĐÃ đủ thời gian quét
             else:
-                break # Thoát khỏi vòng lặp CV2 # Chỉ thoát khỏi vòng lặp CV2
+                break
+
         elif key == ord('v') and not ROI_ACTIVE:
             ROI_DRAWING = not ROI_DRAWING
 
@@ -1676,7 +1738,7 @@ def run_detection_camera(cam_index):
 
 
         # Đã thả chuột → khung VÀNG + chữ
-        if ROI_BOX:
+        if ROI_BOX and ROI_DRAWING:
             x1, y1, x2, y2 = ROI_BOX
             cv2.rectangle(
                 frame,
@@ -1724,7 +1786,7 @@ def run_detection_camera(cam_index):
         is_running = False
         detection_thread = None # Đặt lại luồng để có thể chạy lại
 
-    if len(DATA_LOGS) > 1:
+    if len(DATA_LOGS) > 1 and not force_exit_no_report:
         root.after(100, analyze_and_export_csv) # Chạy hàm xuất CSV trên luồng chính Tkinter
 
 # HÀM CHÍNH CHO FULLSCREEN (Thêm logic thoát)
@@ -1737,6 +1799,7 @@ def run_detection_fullscreen():
     global roi_status_color, roi_status_text, roi_emotion_label, ABNORMAL_THRESHOLD
     global roi_start, roi_end, scale_factor
     global class_name, ZONE_ID
+    global force_exit_no_report
 
     ROI_ACTIVE = False
     ROI_DRAWING = False
@@ -1823,7 +1886,8 @@ def run_detection_fullscreen():
     current_stable_emotion = 'Trung lập'
 
     status_posture = "Không phát hiện tư thế"
-    
+        
+    force_exit_no_report = False
     # Vòng lặp chính
     while is_running:
 
@@ -2217,11 +2281,28 @@ def run_detection_fullscreen():
         elif key == ord('n'): scale_factor = max(0.2, scale_factor - 0.1)
         elif key == ord('q'): 
             # Bắt buộc phải quét tối thiểu 30s
-            if current_time - scan_start_time < SCAN_MIN_DURATION:
-                remaining = int(SCAN_MIN_DURATION - (current_time - scan_start_time))
-                show_warning(f"Chưa đủ thời gian quét! Cần quét tối thiểu {SCAN_MIN_DURATION} giây.\nVui lòng chờ thêm {remaining} giây.")
+            current_time = time.time()
+            elapsed = current_time - scan_start_time
+
+            if elapsed < SCAN_MIN_DURATION:
+                remaining = int(SCAN_MIN_DURATION - elapsed)
+
+                answer = ask_yes_no_blocking(
+                    "Chưa đủ thời gian quét",
+                    f"Cần quét tối thiểu {SCAN_MIN_DURATION} giây.\n"
+                    f"Bạn cần quét thêm {remaining} giây nữa.\n\n"
+                    f"Nếu dừng bây giờ sẽ KHÔNG xuất báo cáo.\n"
+                    f"Bạn có chắc chắn muốn dừng không?"
+                )
+
+                if answer:
+                    force_exit_no_report = True
+                    break
+                else:
+                    continue
             else:
-                break # Thoát khỏi vòng lặp CV2
+                break
+
 
         elif key == ord('v') and not ROI_ACTIVE:
             ROI_DRAWING = not ROI_DRAWING
@@ -2314,7 +2395,7 @@ def run_detection_fullscreen():
             cv2.rectangle(frame, roi_start, roi_end, (255,255,0), 2) # Xanh da trời
 
         # Đã thả chuột → khung VÀNG + chữ
-        if ROI_BOX:
+        if ROI_BOX and ROI_DRAWING:
             x1, y1, x2, y2 = ROI_BOX
             cv2.rectangle(
                 frame,
@@ -2363,7 +2444,7 @@ def run_detection_fullscreen():
         is_running = False
         detection_thread = None # Đặt lại luồng để có thể chạy lại
 
-    if len(DATA_LOGS) > 1:
+    if len(DATA_LOGS) > 1 and not force_exit_no_report:
         root.after(100, analyze_and_export_csv) # Chạy hàm xuất CSV trên luồng chính Tkinter
 
 
