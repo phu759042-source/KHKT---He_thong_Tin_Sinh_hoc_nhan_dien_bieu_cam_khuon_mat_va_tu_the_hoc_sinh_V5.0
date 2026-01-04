@@ -919,6 +919,7 @@ def generate_qr_code(link):
     img_qr_pil = qr.make_image(fill_color="black", back_color="white").convert('RGB')
     return img_qr_pil
 
+# Copy đường link flask server
 def copy_link_to_clipboard(link, link_window):
     global root
     root.clipboard_clear()
@@ -926,6 +927,7 @@ def copy_link_to_clipboard(link, link_window):
     messagebox.showinfo("Thông báo", "Đã sao chép đường link vào Clipboard!")
     link_window.destroy() 
 
+# Copy mã qr
 def copy_qr_to_clipboard(qr_image_pil, link_window):
     """
     Sao chép ảnh PIL Image (QR Code) vào Clipboard dưới dạng DIB (Bitmap).
@@ -950,6 +952,7 @@ def copy_qr_to_clipboard(qr_image_pil, link_window):
     except Exception as e:
         messagebox.showerror("Lỗi Sao Chép Ảnh", f"Không thể sao chép ảnh QR Code vào Clipboard (Chỉ hỗ trợ Windows).\nLỗi: {e}")
 
+# Hiện đường link
 def show_stream_link(link):
     """Hiển thị đường link Stream, Mã QR và các nút hành động."""
     global root
@@ -1013,6 +1016,7 @@ def show_stream_link(link):
     y = root.winfo_y() + (root.winfo_height() - link_window.winfo_reqheight()) // 2
     link_window.geometry(f"+{x}+{y}")
 
+# Hiện hộp thoại loading
 def show_loading_window(title="Đang khởi động hệ thống..."):
     global loading_window, progress_bar, progress_label, root
 
@@ -1058,7 +1062,6 @@ def destroy_loading_window():
 
 def start_flask_server():
     global flask_app
-    # SỬA LỖI: Dùng cổng đã thay đổi
     flask_app.run(host='0.0.0.0', port=5000, threaded=True, debug=False, use_reloader=False)
 
 def gen_frames():
@@ -1195,7 +1198,7 @@ def ask_yes_no_blocking(title, message):
 
     return result['value']
 
-# HÀM CHÍNH CHO CAMERA (Thêm logic thoát)
+# HÀM CHÍNH CHO CAMERA
 
 def run_detection_camera(cam_index):
     global latest_frame, frame_lock, is_running, root, broadcast_thread, detection_thread
@@ -1733,9 +1736,11 @@ def run_detection_camera(cam_index):
         DISPLAY_SCALE_X = WIDTH / new_w
         DISPLAY_SCALE_Y = HEIGHT / new_h
 
-        if ROI_DRAWING and not ROI_ACTIVE and roi_start and roi_end:
-            cv2.rectangle(frame, roi_start, roi_end, (255,255,0), 2) # Xanh da trời
+        # ===== VẼ ROI REALTIME (CAMERA) =====
 
+        # Giữ chuột -> khung XANH DA TRỜI
+        if ROI_DRAWING and not ROI_ACTIVE and roi_start and roi_end:
+            cv2.rectangle(frame, roi_start, roi_end, (255,255,0), 2)
 
         # Đã thả chuột → khung VÀNG + chữ
         if ROI_BOX and ROI_DRAWING:
@@ -1789,7 +1794,7 @@ def run_detection_camera(cam_index):
     if len(DATA_LOGS) > 1 and not force_exit_no_report:
         root.after(100, analyze_and_export_csv) # Chạy hàm xuất CSV trên luồng chính Tkinter
 
-# HÀM CHÍNH CHO FULLSCREEN (Thêm logic thoát)
+# HÀM CHÍNH CHO FULLSCREEN
 
 def run_detection_fullscreen():
     global latest_frame, frame_lock, is_running, root, broadcast_thread, detection_thread
@@ -1895,7 +1900,7 @@ def run_detection_fullscreen():
         frame = np.array(pyautogui.screenshot())
         frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
-        # === BẮT ĐẦU: Logic che cửa sổ OpenCV (Đồng bộ với logic cũ của Fullscreen) ===
+        # === BẮT ĐẦU: Logic che cửa sổ OpenCV ===
         hwnd = win32gui.FindWindow(None, window_title)
         if hwnd:
             try:
@@ -1914,7 +1919,7 @@ def run_detection_fullscreen():
                 pass
         # === KẾT THÚC: Logic che cửa sổ OpenCV ===
         
-        # --- Emotion Detection (Đã đồng bộ) ---
+        # --- Emotion Detection ---
         frame_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
         draw = ImageDraw.Draw(frame_pil)
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -1945,7 +1950,7 @@ def run_detection_fullscreen():
             p_top2 = probabilities[sorted_indices[1]]
             predicted_label = class_labels[sorted_indices[0]] # Nhãn dự đoán
 
-            # 1. KIỂM TRA NGƯỠNG (VALIDATION) theo DOCX
+            # 1. KIỂM TRA NGƯỠNG (VALIDATION)
             config = EMOTION_THRESHOLDS.get(predicted_label, {'p_max': THRESHOLD_P_MAX_DEFAULT, 'delta': THRESHOLD_DELTA_TOP2_DEFAULT})
             
             is_reliable = p_max >= config['p_max']
@@ -1954,7 +1959,7 @@ def run_detection_fullscreen():
             if is_reliable and is_not_ambiguous:
                 raw_validated_label = predicted_label
             else:
-                raw_validated_label = 'Unknown' # Nhãn không đủ tin cậy (theo DOCX)
+                raw_validated_label = 'Unknown' # Nhãn không đủ tin cậy
 
             # 2. CỬA SỔ ỔN ĐỊNH NGẮN HẠN (W: 2-3 GIÂY)
             short_term_emotion_buffer.append(raw_validated_label)
@@ -2392,7 +2397,7 @@ def run_detection_fullscreen():
 
         # Đang kéo chuột → khung XANH DA TRỜI
         if ROI_DRAWING and not ROI_ACTIVE and roi_start and roi_end:
-            cv2.rectangle(frame, roi_start, roi_end, (255,255,0), 2) # Xanh da trời
+            cv2.rectangle(frame, roi_start, roi_end, (255,255,0), 2)
 
         # Đã thả chuột → khung VÀNG + chữ
         if ROI_BOX and ROI_DRAWING:
@@ -2532,10 +2537,7 @@ def open_camera_selection_dialog():
 
 
 def open_class_selection_dialog_for_fullscreen(on_confirm):
-    """
-    Hiển thị hộp thoại chọn lớp trước khi chạy Fullscreen/Camera.
-    on_confirm: callback được gọi sau khi chọn lớp thành công
-    """
+    """Hiển thị hộp thoại chọn lớp trước khi chạy Fullscreen"""
     global root, class_name
 
     class_window = tk.Toplevel(root)
