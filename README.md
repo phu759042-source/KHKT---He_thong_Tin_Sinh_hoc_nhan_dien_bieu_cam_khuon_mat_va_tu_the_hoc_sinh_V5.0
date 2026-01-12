@@ -15,7 +15,7 @@
  <img width="1553" height="660" alt="image" src="https://github.com/user-attachments/assets/8d728c18-b46b-42a7-bdc6-6a14661fc62f" />
 
 ## 3. Trang web
-[Hệ thống Tin - Sinh học nhận diện biểu cảm khuôn mặt và tư thế học sinh](epd-info.onrender.com)
+[Tải sản phẩm](https://epd-info.onrender.com)
 ## 4. Giải thưởng
 Sản phẩm đã đạt giải Nhất tại Cuộc thi Khoa học kĩ thuật cấp trường THPT Nguyễn Trãi và Giải Ba tại Cuộc thi Khoa học kĩ thuật cấp thành phố Đà Nẵng năm học 2025-2026
 - Ngày 27/11/2025(Cấp trường):
