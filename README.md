@@ -1,10 +1,10 @@
-# Hệ thống Tin - Sinh học nhận diện biểu cảm khuôn mặt và tư thế học sinh. Phiên bản 5.0(Phiên bản hoàn thiện nhất)
+# Hệ thống Tin - Sinh học nhận diện biểu cảm khuôn mặt và tư thế học sinh. Phiên bản 5.0
 ## 1. Nhóm tác giả
 - Học sinh: Nguyễn Tấn Phú, Nguyễn Xuân Trụ
 - Giáo viên hướng dẫn: Huỳnh Thị Khánh Nga
 - Lớp: 12/5
 - Trường: THPT Nguyễn Trãi
-## 2. Những cái mới
+## 2. Những cái mới - Chức năng
 - Những cái ở bản 4.5 đều được giữ nguyên
 - Kết hợp hai module quét sàng lọc và quét sâu để có thể tùy chọn chế độ quét
 - Thêm phần gửi dữ liệu lên server cho chế độ quét sâu sau khi đã quét nhiều người để sàng lọc
