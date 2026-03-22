@@ -44,6 +44,7 @@ else:
 icon_path = os.path.join(BASE_DIR, "Emotion + Posture Detector v5.0.ico") 
 icon_path_camera = os.path.join(BASE_DIR, "Emotion + Posture Detector v3.0 Camera.ico")
 icon_path_fullscreen = os.path.join(BASE_DIR, "Emotion + Posture Detector v3.0 Fullscreen Capture.ico")
+icon_path_not_enough_time = os.path.join(BASE_DIR, "not_enough_time.ico")
 font_path = os.path.join(BASE_DIR, "ARIALBD 1.ttf")
 # ==================================================
 
@@ -957,7 +958,7 @@ def copy_qr_to_clipboard(qr_image_pil, link_window):
 # Hiện đường link
 def show_stream_link(link):
     """Hiển thị đường link Stream, Mã QR và các nút hành động."""
-    global root
+    global root, current_mode
     
     # 1. Tạo ảnh QR dưới dạng PIL Image
     qr_image_pil = generate_qr_code(link)
@@ -970,6 +971,12 @@ def show_stream_link(link):
     # 3. Tạo cửa sổ Toplevel
     link_window = tk.Toplevel(root)
     link_window.title("Đường Link Stream và Mã QR")
+    if current_mode == "camera":
+        if os.path.exists(icon_path_camera):
+            link_window.iconbitmap(icon_path_camera)
+    else:
+        if os.path.exists(icon_path_camera):
+            link_window.iconbitmap(icon_path_fullscreen)
     link_window.update() 
 
     # 4. Hiển thị Mã QR
@@ -1020,11 +1027,17 @@ def show_stream_link(link):
 
 # Hiện hộp thoại loading
 def show_loading_window(title="Đang khởi động hệ thống..."):
-    global loading_window, progress_bar, progress_label, root
+    global loading_window, progress_bar, progress_label, root, current_mode
 
     loading_window = tk.Toplevel(root)
     loading_window.title(title)
-    loading_window.geometry("400x140")
+    if current_mode == "camera":
+        if os.path.exists(icon_path_camera):
+            loading_window.iconbitmap(icon_path_camera)
+    else:
+        if os.path.exists(icon_path_camera):
+            loading_window.iconbitmap(icon_path_fullscreen)
+    loading_window.geometry("470x140")
     loading_window.resizable(False, False)
 #    loading_window.attributes('-topmost', True)
 
@@ -1163,6 +1176,8 @@ HTML_PAGE = """
 def ask_yes_no_blocking(title, message):
     dialog = tk.Toplevel(root)
     dialog.title(title)
+    if os.path.exists(icon_path_not_enough_time):
+        dialog.iconbitmap(icon_path_not_enough_time)
     dialog.attributes('-topmost', True)
     dialog.grab_set()  # khóa focus
     dialog.resizable(False, False)
