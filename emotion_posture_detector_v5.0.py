@@ -42,6 +42,8 @@ else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 icon_path = os.path.join(BASE_DIR, "Emotion + Posture Detector v5.0.ico") 
+icon_path_camera = os.path.join(BASE_DIR, "Emotion + Posture Detector v3.0 Camera.ico")
+icon_path_fullscreen = os.path.join(BASE_DIR, "Emotion + Posture Detector v3.0 Fullscreen Capture.ico")
 font_path = os.path.join(BASE_DIR, "ARIALBD 1.ttf")
 # ==================================================
 
@@ -345,7 +347,7 @@ def show_success_with_open_folder(parent, export_file_path_csv, summary_path_txt
     win.attributes("-topmost", True)
     win.resizable(False, False)
 
-    # 📐 Kích thước CHUẨN – không bao giờ vỡ
+    # Kích thước hộp thoại
     w, h = 560, 260
     x = (win.winfo_screenwidth() - w) // 2
     y = (win.winfo_screenheight() - h) // 2
@@ -1195,6 +1197,21 @@ def ask_yes_no_blocking(title, message):
     dialog.geometry(f"+{x}+{y}")
 
     dialog.wait_window()  # ⛔ BLOCK tại đây
+
+    return result['value']
+
+def ask_yes_no_on_main_thread(title, message):
+    result = {'value': None}
+
+    def _show():
+        result['value'] = ask_yes_no_blocking(title, message)
+
+    # Chạy trên MAIN THREAD
+    root.after(0, _show)
+
+    # CHỜ kết quả
+    while result['value'] is None:
+        time.sleep(0.05)
 
     return result['value']
 
@@ -2125,7 +2142,7 @@ def run_detection_fullscreen():
                             mp_pose.POSE_CONNECTIONS
                         )
                 except Exception:
-                    #Xử lý khi không tìm thấy đủ 3 điểm (Xảy ra khi quay nghiêng quá nhiều)
+                    # Xử lý khi không tìm thấy đủ 3 điểm (Xảy ra khi quay nghiêng quá nhiều)
                     status_back_detail = "Không đủ điểm (Quá nghiêng)"
                     status_posture = "Không phát hiện tư thế"
                     color = (255, 255, 255) # Trắng
@@ -2261,11 +2278,11 @@ def run_detection_fullscreen():
                 })
             last_log_time = current_time
 
-        # --- DRAWING TEXT (Đã đồng bộ) ---
+        # --- DRAWING TEXT ---
         frame_pil = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
         draw = ImageDraw.Draw(frame_pil)
 
-        # LƯU Ý: Thay đổi vị trí text để phù hợp với màn hình lớn
+        # --- Hiển thị Text ---
         draw_text_with_outline(draw, (20, 20), f"Tư thế Lưng: {status_back_detail} ({int(angle_back)}°)", font2, (255, 255, 255))
         draw_text_with_outline(draw, (20, 50), f"Trạng thái tổng: {status_posture}", font2, color) # Hiển thị tóm tắt và màu
         draw_text_with_outline(draw, (20, 80), f"Số lượng: {len(faces)}", font2, (255, 0, 255))
@@ -2292,7 +2309,7 @@ def run_detection_fullscreen():
             if elapsed < SCAN_MIN_DURATION:
                 remaining = int(SCAN_MIN_DURATION - elapsed)
 
-                answer = ask_yes_no_blocking(
+                answer = ask_yes_no_on_main_thread(
                     "Chưa đủ thời gian quét",
                     f"Cần quét tối thiểu {SCAN_MIN_DURATION} giây.\n"
                     f"Bạn cần quét thêm {remaining} giây nữa.\n\n"
@@ -2377,7 +2394,7 @@ def run_detection_fullscreen():
             ROI_STATE_TRACKER["state"] = None
             ROI_STATE_TRACKER["start_time"] = None
 
-            root.after(0, export_roi_to_word)
+            export_roi_to_word()
             ROI_IMAGE_PATH = None
             ZONE_ID = None
 
@@ -2478,7 +2495,7 @@ def select_camera_and_run(cam_index):
 
 def open_camera_selection_dialog():
     """Hiển thị cửa sổ chọn camera và lớp trước khi chạy chế độ Camera."""
-    global cam_window, camera_combo, class_combo, class_name, root
+    global cam_window, camera_combo, class_combo, class_name, root, icon_path_camera
 
     # Kiểm tra xem có đang chạy chế độ nào không
     with thread_lock:
@@ -2489,6 +2506,8 @@ def open_camera_selection_dialog():
     
     cam_window = tk.Toplevel(root)
     cam_window.title("Chọn Camera và Lớp")
+    if os.path.exists(icon_path_camera):
+        cam_window.iconbitmap(icon_path_camera)
     # cam_window.attributes('-topmost', True)
     
     cameras = ["Chọn Camera..."] + list_cameras()
@@ -2542,6 +2561,8 @@ def open_class_selection_dialog_for_fullscreen(on_confirm):
 
     class_window = tk.Toplevel(root)
     class_window.title("Chọn lớp")
+    if os.path.exists(icon_path_fullscreen):
+        class_window.iconbitmap(icon_path_fullscreen)
     class_window.resizable(False, False)
     class_window.grab_set()  # Khóa các cửa sổ khác
 
