@@ -2605,6 +2605,11 @@ def open_class_selection_dialog_for_fullscreen(on_confirm):
     class_combo.current(0)
     class_combo.pack(pady=5)
 
+    tk.Label(class_window, text="Hướng dẫn vẽ khung:", font=("Arial", 8)).pack(pady=1)
+    tk.Label(class_window, text="1. Bấm phím V để bật/tắt vẽ khung", font=("Arial", 8)).pack(pady=1)
+    tk.Label(class_window, text="2. Bấm phím S để bắt đầu quét", font=("Arial", 8)).pack(pady=1)
+    tk.Label(class_window, text="3. Bấm phím E để dừng quét và xuất file", font=("Arial", 8)).pack(pady=1)
+
     def confirm():
         global class_name
         selected = class_combo.get()
