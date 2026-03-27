@@ -928,7 +928,6 @@ def copy_link_to_clipboard(link, link_window):
     root.clipboard_clear()
     root.clipboard_append(link)
     messagebox.showinfo("Thông báo", "Đã sao chép đường link vào Clipboard!")
-    link_window.destroy() 
 
 # Copy mã qr
 def copy_qr_to_clipboard(qr_image_pil, link_window):
@@ -950,7 +949,6 @@ def copy_qr_to_clipboard(qr_image_pil, link_window):
         win32clipboard.CloseClipboard()
         
         messagebox.showinfo("Thông báo", "Đã sao chép ảnh QR Code vào Clipboard thành công!")
-        link_window.destroy()
         
     except Exception as e:
         messagebox.showerror("Lỗi Sao Chép Ảnh", f"Không thể sao chép ảnh QR Code vào Clipboard (Chỉ hỗ trợ Windows).\nLỗi: {e}")
@@ -1244,6 +1242,7 @@ def run_detection_camera(cam_index):
 
     ROI_ACTIVE = False
     ROI_DRAWING = False
+    ROI_BOX = None
     DATA_LOGS = [] # Xóa log cũ
     scan_start_time = time.time()
     last_log_time = time.time()
@@ -1840,6 +1839,7 @@ def run_detection_fullscreen():
 
     ROI_ACTIVE = False
     ROI_DRAWING = False
+    ROI_BOX = None
     roi_start = None
     roi_end = None
 
@@ -2572,8 +2572,13 @@ def open_camera_selection_dialog():
 
 def open_class_selection_dialog_for_fullscreen(on_confirm):
     """Hiển thị hộp thoại chọn lớp trước khi chạy Fullscreen"""
-    global root, class_name
+    global root, class_name, is_running
 
+    with thread_lock:
+        if is_running:
+             messagebox.showwarning("Đang chạy", "Một chế độ quét đang chạy. Vui lòng tắt cửa sổ quét (hoặc nhấn 'Q') trước.")
+             return 
+   
     class_window = tk.Toplevel(root)
     class_window.title("Chọn lớp")
     if os.path.exists(icon_path_fullscreen):
@@ -2620,10 +2625,12 @@ def open_class_selection_dialog_for_fullscreen(on_confirm):
                 "Vui lòng chọn một lớp trước khi tiếp tục."
             )
             return
-
+            
+        with thread_lock:
+            if is_running:
+                 messagebox.showwarning("Đang chạy", "Một chế độ quét đang chạy. Vui lòng tắt cửa sổ quét (hoặc nhấn 'Q') trước.")
+                 return 
         class_name = selected  # GÁN BIẾN TOÀN CỤC
-        class_window.destroy()
-
         if callable(on_confirm):
             on_confirm()
 
