@@ -2509,66 +2509,149 @@ def select_camera_and_run(cam_index):
     detection_thread.start()
 
 def open_camera_selection_dialog():
-    """Hiển thị cửa sổ chọn camera và lớp trước khi chạy chế độ Camera."""
+    """Hiển thị cửa sổ chọn camera + preview Full HD."""
     global cam_window, camera_combo, class_combo, class_name, root, icon_path_camera
 
-    # Kiểm tra xem có đang chạy chế độ nào không
+    import cv2
+    from PIL import Image, ImageTk
+
+    # Kiểm tra đang chạy
     with thread_lock:
         if is_running:
             messagebox.showwarning("Đang chạy", 
-                                   "Một chế độ quét đang chạy. Vui lòng tắt cửa sổ quét (hoặc nhấn 'Q') trước.")
+                "Một chế độ quét đang chạy. Vui lòng tắt trước.")
             return 
     
     cam_window = tk.Toplevel(root)
     cam_window.title("Chọn Camera và Lớp")
+
     if os.path.exists(icon_path_camera):
         cam_window.iconbitmap(icon_path_camera)
-    # cam_window.attributes('-topmost', True)
-    
+
     cameras = ["Chọn Camera..."] + list_cameras()
-    tk.Label(cam_window, text="Vui lòng chọn camera để quét:", font=("Arial", 10)).pack(pady=5)
+
+    tk.Label(cam_window, text="Vui lòng chọn camera:", font=("Arial", 10)).pack(pady=5)
 
     camera_combo = ttk.Combobox(cam_window, values=cameras, state="readonly", width=30)
     camera_combo.current(0)
     camera_combo.pack(pady=5)
 
-    # --- Thêm ComboBox chọn lớp ---
+    # ===== PREVIEW =====
+    preview_label = tk.Label(cam_window)
+    preview_label.pack()
+
+    cap = {"obj": None}  # dùng dict để sửa trong nested function
+    frame_size_set = {"flag": False}
+
+    def start_preview(index):
+        # đóng camera cũ
+        if cap["obj"] is not None:
+            cap["obj"].release()
+
+        cap["obj"] = cv2.VideoCapture(index)
+
+        # ép FULL HD
+        cap["obj"].set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+        cap["obj"].set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+        cap["obj"].set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+
+        frame_size_set["flag"] = False
+
+    MAX_W = 1000
+    MAX_H = 700
+
+    def center_window():
+        cam_window.update_idletasks()
+        x = root.winfo_x() + (root.winfo_width() - cam_window.winfo_width()) // 2
+        y = root.winfo_y() + (root.winfo_height() - cam_window.winfo_height()) // 2
+        cam_window.geometry(f"+{x}+{y}")
+
+    def update_preview():
+        if cap["obj"] is not None:
+            ret, frame = cap["obj"].read()
+            if ret:
+                h, w, _ = frame.shape
+
+                # Hiển thị độ phân giải gốc
+                cv2.putText(frame, f"{w}x{h}", (10, 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
+
+                # 🔥 TÍNH SCALE GIỮ TỈ LỆ
+                scale = min(MAX_W / w, MAX_H / h, 1.0)
+                new_w = int(w * scale)
+                new_h = int(h * scale)
+
+                frame_resized = cv2.resize(frame, (new_w, new_h))
+
+                # Resize cửa sổ theo kích thước đã scale
+                if not frame_size_set["flag"]:
+                    cam_window.geometry(f"{new_w}x{new_h + 300}")
+                    frame_size_set["flag"] = True
+
+                    center_window()
+
+                frame_resized = cv2.cvtColor(frame_resized, cv2.COLOR_BGR2RGB)
+                img = Image.fromarray(frame_resized)
+                imgtk = ImageTk.PhotoImage(image=img)
+
+                preview_label.imgtk = imgtk
+                preview_label.configure(image=imgtk)
+
+        cam_window.after(10, update_preview)
+
+    def on_camera_change(event):
+        idx = camera_combo.current() - 1
+        if idx >= 0:
+            start_preview(idx)
+
+    camera_combo.bind("<<ComboboxSelected>>", on_camera_change)
+
+    # ===== CHỌN LỚP =====
     tk.Label(cam_window, text="Chọn lớp học:", font=("Arial", 10)).pack(pady=5)
+
     classes = ["Lớp 12A1", "Lớp 12A2", "Lớp 12A3", "Lớp 12A4", "Lớp 12A5"]
     class_combo = ttk.Combobox(cam_window, values=classes, state="readonly", width=30)
-    class_combo.current(0)  # Mặc định chọn lớp đầu tiên
+    class_combo.current(0)
     class_combo.pack(pady=5)
 
+    # ===== HƯỚNG DẪN =====
     tk.Label(cam_window, text="Hướng dẫn vẽ khung:", font=("Arial", 8)).pack(pady=1)
-    tk.Label(cam_window, text="1. Bấm phím V để bật/tắt vẽ khung", font=("Arial", 8)).pack(pady=1)
-    tk.Label(cam_window, text="2. Bấm phím S để bắt đầu quét", font=("Arial", 8)).pack(pady=1)
-    tk.Label(cam_window, text="3. Bấm phím E để dừng quét và xuất file", font=("Arial", 8)).pack(pady=1)
+    tk.Label(cam_window, text="1. Bấm V để bật/tắt vẽ", font=("Arial", 8)).pack()
+    tk.Label(cam_window, text="2. Bấm S để quét", font=("Arial", 8)).pack()
+    tk.Label(cam_window, text="3. Bấm E để dừng", font=("Arial", 8)).pack()
 
     def on_run():
         selected_index = camera_combo.current() - 1
         if selected_index < 0:
-            messagebox.showwarning("Chưa chọn", "Vui lòng chọn một camera trong danh sách.")
+            messagebox.showwarning("Chưa chọn", "Vui lòng chọn camera.")
             return
         
-        # Lấy lớp học được chọn
         global class_name
         class_name = class_combo.get()
-        if not class_name:
-            messagebox.showwarning("Chưa chọn", "Vui lòng chọn một lớp học.")
-            return
+
+        if cap["obj"] is not None:
+            cap["obj"].release()
 
         select_camera_and_run(selected_index)
 
     tk.Button(cam_window, text="Mở camera", command=on_run,
               bg="#007ACC", fg="white", font=("Arial", 10, "bold")).pack(pady=10)
 
-    # Căn giữa cửa sổ
+    # update preview loop
+    update_preview()
+
+    # căn giữa
     root.update_idletasks()
     cam_window.update_idletasks()
     x = root.winfo_x() + (root.winfo_width() - cam_window.winfo_reqwidth()) // 2
     y = root.winfo_y() + (root.winfo_height() - cam_window.winfo_reqheight()) // 2
     cam_window.geometry(f"+{x}+{y}")
+    def on_close():
+        if cap["obj"] is not None:
+            cap["obj"].release()
+        cam_window.destroy()
 
+    cam_window.protocol("WM_DELETE_WINDOW", on_close)
 
 def open_class_selection_dialog_for_fullscreen(on_confirm):
     """Hiển thị hộp thoại chọn lớp trước khi chạy Fullscreen"""
