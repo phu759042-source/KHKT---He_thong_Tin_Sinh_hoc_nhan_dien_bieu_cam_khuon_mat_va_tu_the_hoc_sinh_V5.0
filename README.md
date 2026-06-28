@@ -4,6 +4,7 @@
 - Giáo viên hướng dẫn: Huỳnh Thị Khánh Nga
 - Lớp: 12/5
 - Trường: THPT Nguyễn Trãi
+- Năm học 2025-2026
 ## 2. Chức năng
 - Kết hợp hai module quét sàng lọc và quét sâu
 - Quét sàng lọc để lọc ra những học sinh cần quan sát và sau đó mới quét sâu để có thông số chi tiết
