@@ -8,9 +8,11 @@
 - Kết hợp hai module quét sàng lọc và quét sâu
 - Quét sàng lọc để lọc ra những học sinh cần quan sát và sau đó mới quét sâu để có thông số chi tiết
 - Gửi dữ liệu lên server cho chế độ quét sàng lọc và quét sâu đễ dễ dàng quản lí dữ liệu
-### • Quét sàng lọc
+
+**Quét sàng lọc**
 <img width="1608" height="909" alt="image" src="https://github.com/user-attachments/assets/d640b189-fb28-4e67-a364-2a9c37c7c0f1" />
-### • Quét sâu
+
+**Quét sâu**
 <img width="1078" height="636" alt="image" src="https://github.com/user-attachments/assets/b393a0f1-cd67-4de8-898d-1102b2407120" />
 
 - Xuất báo cáo dạng file word định lượng rõ ràng và có biểu đồ để hỗ trợ tư vấn sức khỏe học đường
