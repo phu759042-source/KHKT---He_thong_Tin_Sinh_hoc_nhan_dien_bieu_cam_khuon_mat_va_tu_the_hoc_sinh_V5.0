@@ -14,7 +14,7 @@ Hệ thống hỗ trợ theo dõi **biểu cảm khuôn mặt** và **tư thế 
 - 📷 **Quét bằng Camera**: nhận diện biểu cảm và tư thế thông qua camera.
 - 🖥️ **Quét bằng màn hình**: sử dụng hình ảnh chụp từ màn hình để thực hiện nhận diện.
 - 🎯 **Theo dõi ROI** (*Region of Interest*): khoanh vùng và theo dõi một học sinh cụ thể.
-- 🤖 **AI Smart Monitor**: mở giao diện giám sát thông minh.
+- 🤖 **AI Smart Monitor**: mở giao diện giám sát và quét sàng lọc.
 - 📊 **Xuất báo cáo**: tạo báo cáo kết quả sau phiên quét.
 
 ---
