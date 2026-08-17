@@ -5,7 +5,7 @@
 - Lớp: 12/5
 - Trường: THPT Nguyễn Trãi
 - Năm học 2025-2026
-# II. Chức năng
+# II. Chi tiết sản phẩm
 
 Hệ thống hỗ trợ theo dõi **biểu cảm khuôn mặt** và **tư thế ngồi** thông qua camera hoặc màn hình máy tính.
 
