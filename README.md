@@ -389,7 +389,7 @@ Sản phẩm đã đạt giải Nhất tại Cuộc thi Khoa học kĩ thuật c
 - Ngày 27/11/2025(Cấp trường):
 ![z7267413454464_05ab5d4d965537be988674d64058b4c5](https://github.com/user-attachments/assets/c2cf1272-0a45-4ad5-b7ca-1918e65e1780)
 
-- Ngày 1/10/2026(Cấp thành phố):
+- Ngày 10/1/2026(Cấp thành phố):
 ![614478204_1434528832005855_509348093538316051_n](https://github.com/user-attachments/assets/d92ab5c2-1f92-4965-8b81-effe1bc57df3)
 ![614541791_1434528878672517_2539231648361761621_n](https://github.com/user-attachments/assets/834292c8-bc4c-45f2-83d0-6643bdc85822)
 
